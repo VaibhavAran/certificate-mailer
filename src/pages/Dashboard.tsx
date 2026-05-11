@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
+const API_URL =
+  import.meta.env
+    .VITE_API_URL ||
+  "https://certificate-mailer.onrender.com";
+
 function Dashboard() {
   const [csvFile, setCsvFile] =
     useState<File | null>(null);
@@ -9,15 +14,19 @@ function Dashboard() {
     useState<File | null>(null);
 
   const [subject, setSubject] =
-    useState(() =>
-      localStorage.getItem(
-        "subject"
-      ) ||
-      "Your Participation Certificate"
+    useState(
+      () =>
+        localStorage.getItem(
+          "subject"
+        ) ||
+        "Your Participation Certificate"
     );
 
-  const [emailContent, setEmailContent] =
-    useState(() =>
+  const [
+    emailContent,
+    setEmailContent,
+  ] = useState(
+    () =>
       localStorage.getItem(
         "emailContent"
       ) ||
@@ -29,7 +38,7 @@ Please find your certificate attached.
 
 Regards,
 Team`
-    );
+  );
 
   const [loading, setLoading] =
     useState(false);
@@ -43,14 +52,18 @@ Team`
       sending: false,
     });
 
-  const [completedStats, setCompletedStats] =
-    useState<null | {
-      success: number;
-      failed: number;
-      total: number;
-    }>(null);
+  const [
+    completedStats,
+    setCompletedStats,
+  ] = useState<null | {
+    success: number;
+    failed: number;
+    total: number;
+  }>(null);
 
-  /* LocalStorage */
+  /* -----------------------------
+     LocalStorage
+  ----------------------------- */
 
   useEffect(() => {
     localStorage.setItem(
@@ -66,42 +79,55 @@ Team`
     );
   }, [emailContent]);
 
-  /* Progress Polling */
+  /* -----------------------------
+     Progress Polling
+  ----------------------------- */
 
   useEffect(() => {
     let interval: number;
 
     if (loading) {
-      interval = window.setInterval(
-        async () => {
-          try {
-            const response =
-              await axios.get(
-                "http://localhost:5000/api/progress"
-              );
+      interval =
+        window.setInterval(
+          async () => {
+            try {
+              const response =
+                await axios.get(
+                  `${API_URL}/api/progress`
+                );
 
-            setProgress(
-              response.data
-            );
-          } catch (error) {
-            console.log(error);
-          }
-        },
-        1000
-      );
+              setProgress(
+                response.data
+              );
+            } catch (error) {
+              console.log(
+                error
+              );
+            }
+          },
+          1000
+        );
     }
 
     return () =>
-      clearInterval(interval);
+      clearInterval(
+        interval
+      );
   }, [loading]);
 
-  /* Send */
+  /* -----------------------------
+     Send
+  ----------------------------- */
 
   const handleSend =
     async () => {
-      if (loading) return;
+      if (loading)
+        return;
 
-      if (!csvFile || !zipFile) {
+      if (
+        !csvFile ||
+        !zipFile
+      ) {
         alert(
           "Please upload CSV and ZIP"
         );
@@ -113,10 +139,16 @@ Team`
           "Are you sure?\n\nCertificates will be sent to all participants."
         );
 
-      if (!confirmSend) return;
+      if (
+        !confirmSend
+      )
+        return;
 
       try {
-        setLoading(true);
+        setLoading(
+          true
+        );
+
         setCompletedStats(
           null
         );
@@ -146,8 +178,15 @@ Team`
 
         const response =
           await axios.post(
-            "http://localhost:5000/api/send-certificates",
-            formData
+            `${API_URL}/api/send-certificates`,
+            formData,
+            {
+              headers:
+                {
+                  "Content-Type":
+                    "multipart/form-data",
+                },
+            }
           );
 
         /* Save Logs */
@@ -155,21 +194,29 @@ Team`
         localStorage.setItem(
           "certificateLogs",
           JSON.stringify(
-            response.data.logs
+            response.data
+              .logs
           )
         );
 
         setCompletedStats(
-          response.data.stats
+          response.data
+            .stats
         );
-      } catch (error) {
-        console.log(error);
+      } catch (
+        error
+      ) {
+        console.log(
+          error
+        );
 
         alert(
           "Sending Failed ❌"
         );
       } finally {
-        setLoading(false);
+        setLoading(
+          false
+        );
       }
     };
 
@@ -177,13 +224,16 @@ Team`
     <div className="page-container">
       <div className="page-header">
         <h1>
-          Certificate Email
+          Certificate
+          Email
           Automation
         </h1>
 
         <p>
-          Upload CSV and ZIP to
-          send certificates.
+          Upload CSV
+          and ZIP to
+          send
+          certificates.
         </p>
       </div>
 
@@ -192,17 +242,23 @@ Team`
 
         <div className="form-group">
           <label>
-            Upload CSV File
+            Upload CSV
+            File
           </label>
 
           <input
             type="file"
             accept=".csv"
             className="input"
-            disabled={loading}
-            onChange={(e) =>
+            disabled={
+              loading
+            }
+            onChange={(
+              e
+            ) =>
               setCsvFile(
-                e.target.files?.[0] ||
+                e.target
+                  .files?.[0] ||
                   null
               )
             }
@@ -213,17 +269,23 @@ Team`
 
         <div className="form-group">
           <label>
-            Upload ZIP File
+            Upload ZIP
+            File
           </label>
 
           <input
             type="file"
             accept=".zip"
             className="input"
-            disabled={loading}
-            onChange={(e) =>
+            disabled={
+              loading
+            }
+            onChange={(
+              e
+            ) =>
               setZipFile(
-                e.target.files?.[0] ||
+                e.target
+                  .files?.[0] ||
                   null
               )
             }
@@ -234,17 +296,25 @@ Team`
 
         <div className="form-group">
           <label>
-            Email Subject
+            Email
+            Subject
           </label>
 
           <input
             type="text"
             className="input"
-            disabled={loading}
-            value={subject}
-            onChange={(e) =>
+            disabled={
+              loading
+            }
+            value={
+              subject
+            }
+            onChange={(
+              e
+            ) =>
               setSubject(
-                e.target.value
+                e.target
+                  .value
               )
             }
           />
@@ -254,16 +324,24 @@ Team`
 
         <div className="form-group">
           <label>
-            Email Content
+            Email
+            Content
           </label>
 
           <textarea
             className="textarea"
-            disabled={loading}
-            value={emailContent}
-            onChange={(e) =>
+            disabled={
+              loading
+            }
+            value={
+              emailContent
+            }
+            onChange={(
+              e
+            ) =>
               setEmailContent(
-                e.target.value
+                e.target
+                  .value
               )
             }
           />
@@ -276,7 +354,8 @@ Team`
             style={{
               marginBottom:
                 "20px",
-              padding: "20px",
+              padding:
+                "20px",
               borderRadius:
                 "12px",
               background:
@@ -289,8 +368,13 @@ Team`
             </h3>
 
             <p>
-              {progress.current} /{" "}
-              {progress.total}
+              {
+                progress.current
+              }{" "}
+              /{" "}
+              {
+                progress.total
+              }
             </p>
 
             <p>
@@ -318,7 +402,8 @@ Team`
             style={{
               marginBottom:
                 "20px",
-              padding: "20px",
+              padding:
+                "20px",
               borderRadius:
                 "12px",
               background:
@@ -326,7 +411,8 @@ Team`
             }}
           >
             <h3>
-              ✅ Completed
+              ✅
+              Completed
             </h3>
 
             <p>
@@ -357,8 +443,12 @@ Team`
 
         <button
           className="send-button"
-          onClick={handleSend}
-          disabled={loading}
+          onClick={
+            handleSend
+          }
+          disabled={
+            loading
+          }
         >
           {loading
             ? "Sending..."
@@ -366,8 +456,19 @@ Team`
         </button>
       </div>
 
-      <footer style={{ marginTop: "40px", textAlign: "center", color: "#888" }}>
-        Made by Vaibhav Aran
+      <footer
+        style={{
+          marginTop:
+            "40px",
+          textAlign:
+            "center",
+          color:
+            "#888",
+        }}
+      >
+        Made by
+        Vaibhav
+        Aran
       </footer>
     </div>
   );
