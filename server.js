@@ -61,12 +61,13 @@ const upload = multer({
 /* -----------------------------
    Gmail Transport
 ----------------------------- */
+
 const transporter =
   nodemailer.createTransport({
     service: "gmail",
 
     pool: true,
-    maxConnections: 4,
+    maxConnections: 1,
     maxMessages: Infinity,
 
     auth: {
