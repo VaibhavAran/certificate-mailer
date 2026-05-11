@@ -5,10 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"vite\" \"nodemon server.js\"",
-    "client": "vite",
-    "server": "nodemon server.js",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "server": "node server.js",
+    "build": "vite build",
+    "start": "node server.js"
   },
   "dependencies": {
     "adm-zip": "^0.5.17",
@@ -19,6 +18,7 @@
     "express": "^5.2.1",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.7",
+    "os": "^0.1.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-dropzone": "^15.0.0",

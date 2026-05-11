@@ -7,14 +7,19 @@ import fs from "fs";
 import AdmZip from "adm-zip";
 import csvParser from "csv-parser";
 import nodemailer from "nodemailer";
+import os from "os";
 
 dotenv.config();
 
 const app = express();
 
+/* -----------------------------
+   CORS
+----------------------------- */
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "*",
   })
 );
 
@@ -36,23 +41,80 @@ let progress = {
    Upload Storage
 ----------------------------- */
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    if (file.fieldname === "zip") {
-      cb(null, "uploads/zip");
-    } else {
-      cb(null, "uploads");
-    }
-  },
+const uploadBasePath =
+  process.env.NODE_ENV ===
+  "production"
+    ? path.join(
+        os.tmpdir(),
+        "certificate-mailer"
+      )
+    : "uploads";
 
-  filename: function (req, file, cb) {
-    cb(
-      null,
-      Date.now() +
-        path.extname(file.originalname)
-    );
-  },
+const extractedFolder =
+  path.join(
+    uploadBasePath,
+    "extracted"
+  );
+
+const zipFolder =
+  path.join(
+    uploadBasePath,
+    "zip"
+  );
+
+/* Create folders if missing */
+
+[
+  uploadBasePath,
+  extractedFolder,
+  zipFolder,
+].forEach((folder) => {
+  if (
+    !fs.existsSync(folder)
+  ) {
+    fs.mkdirSync(folder, {
+      recursive: true,
+    });
+  }
 });
+
+const storage =
+  multer.diskStorage({
+    destination: function (
+      req,
+      file,
+      cb
+    ) {
+      if (
+        file.fieldname ===
+        "zip"
+      ) {
+        cb(
+          null,
+          zipFolder
+        );
+      } else {
+        cb(
+          null,
+          uploadBasePath
+        );
+      }
+    },
+
+    filename: function (
+      req,
+      file,
+      cb
+    ) {
+      cb(
+        null,
+        Date.now() +
+          path.extname(
+            file.originalname
+          )
+      );
+    },
+  });
 
 const upload = multer({
   storage,
@@ -67,12 +129,17 @@ const transporter =
     service: "gmail",
 
     pool: true,
-    maxConnections: 1,
-    maxMessages: Infinity,
+    maxConnections: 3,
+    maxMessages:
+      Infinity,
 
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user:
+        process.env
+          .EMAIL_USER,
+      pass:
+        process.env
+          .EMAIL_PASS,
     },
   });
 
@@ -80,27 +147,51 @@ const transporter =
    Helpers
 ----------------------------- */
 
-function parseCSV(csvPath) {
+function parseCSV(
+  csvPath
+) {
   return new Promise(
-    (resolve, reject) => {
-      const results = [];
+    (
+      resolve,
+      reject
+    ) => {
+      const results =
+        [];
 
-      fs.createReadStream(csvPath)
-        .pipe(csvParser())
-        .on("data", (data) =>
-          results.push(data)
+      fs.createReadStream(
+        csvPath
+      )
+        .pipe(
+          csvParser()
         )
-        .on("end", () =>
-          resolve(results)
+        .on(
+          "data",
+          (data) =>
+            results.push(
+              data
+            )
         )
-        .on("error", (err) =>
-          reject(err)
+        .on(
+          "end",
+          () =>
+            resolve(
+              results
+            )
+        )
+        .on(
+          "error",
+          (err) =>
+            reject(
+              err
+            )
         );
     }
   );
 }
 
-function isValidEmail(email) {
+function isValidEmail(
+  email
+) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
     email
   );
@@ -110,16 +201,29 @@ function isValidEmail(email) {
    Routes
 ----------------------------- */
 
-app.get("/", (req, res) => {
-  res.send("Backend Running 🚀");
-});
+app.get(
+  "/",
+  (
+    req,
+    res
+  ) => {
+    res.send(
+      "Backend Running 🚀"
+    );
+  }
+);
 
 /* Progress API */
 
 app.get(
   "/api/progress",
-  (req, res) => {
-    res.json(progress);
+  (
+    req,
+    res
+  ) => {
+    res.json(
+      progress
+    );
   }
 );
 
@@ -137,20 +241,33 @@ app.post(
       maxCount: 1,
     },
   ]),
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
       const csvFile =
-        req.files.csv?.[0];
+        req.files
+          ?.csv?.[0];
 
       const zipFile =
-        req.files.zip?.[0];
+        req.files
+          ?.zip?.[0];
 
-      if (!csvFile || !zipFile) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "CSV or ZIP missing",
-        });
+      if (
+        !csvFile ||
+        !zipFile
+      ) {
+        return res
+          .status(
+            400
+          )
+          .json({
+            success:
+              false,
+            message:
+              "CSV or ZIP missing",
+          });
       }
 
       const {
@@ -168,25 +285,19 @@ app.post(
         sending: true,
       };
 
-      /* -----------------------------
-         Clear Old Files
-      ----------------------------- */
-
-      const extractedFolder =
-        "uploads/extracted";
+      /* Clear old extracted */
 
       if (
         fs.existsSync(
           extractedFolder
         )
       ) {
-        const oldFiles =
-          fs.readdirSync(
-            extractedFolder
-          );
-
-        oldFiles.forEach(
-          (file) => {
+        fs.readdirSync(
+          extractedFolder
+        ).forEach(
+          (
+            file
+          ) => {
             fs.unlinkSync(
               path.join(
                 extractedFolder,
@@ -201,12 +312,12 @@ app.post(
         "Old extracted files cleared"
       );
 
-      /* -----------------------------
-         Extract ZIP
-      ----------------------------- */
+      /* Extract ZIP */
 
       const zip =
-        new AdmZip(zipFile.path);
+        new AdmZip(
+          zipFile.path
+        );
 
       zip.extractAllTo(
         extractedFolder,
@@ -222,9 +333,7 @@ app.post(
           extractedFolder
         );
 
-      /* -----------------------------
-         Read CSV
-      ----------------------------- */
+      /* Read CSV */
 
       const participants =
         await parseCSV(
@@ -234,161 +343,200 @@ app.post(
       progress.total =
         participants.length;
 
-      const logs = [];
+      const logs =
+        [];
 
-      /* -----------------------------
-         FAST SINGLE SEND MODE
-      ----------------------------- */
+      /* Fast Mode */
 
-      for (const participant of participants) {
-        progress.current++;
+      const BATCH_SIZE = 3;
 
-        try {
-          const name =
-            participant.name?.trim();
-
-          const email =
-            participant.email?.trim();
-
-          /* Validate Email */
-
-          if (
-            !email ||
-            !isValidEmail(email)
-          ) {
-            progress.failed++;
-
-            logs.push({
-              name,
-              email,
-              status:
-                "Invalid Email",
-            });
-
-            continue;
-          }
-
-          /* Match Certificate */
-
-          const certificateName =
-            name.replace(
-              /\s+/g,
-              "_"
-            ) + ".png";
-
-          const exists =
-            extractedFiles.includes(
-              certificateName
-            );
-
-          if (!exists) {
-            progress.failed++;
-
-            logs.push({
-              name,
-              email,
-              status:
-                "Certificate Missing",
-            });
-
-            continue;
-          }
-
-          const certificatePath =
-            path.join(
-              process.cwd(),
-              "uploads",
-              "extracted",
-              certificateName
-            );
-
-          const personalizedEmail =
-            emailContent.replace(
-              "{name}",
-              name
-            );
-
-          /* Send Email */
-
-          await transporter.sendMail({
-            from:
-              process.env.EMAIL_USER,
-
-            to: email,
-
-            subject,
-
-            text:
-              personalizedEmail,
-
-            attachments: [
-              {
-                filename:
-                  certificateName,
-
-                path:
-                  certificatePath,
-              },
-            ],
-          });
-
-          progress.success++;
-
-          logs.push({
-            name,
-            email,
-            status: "Sent",
-          });
-
-          console.log(
-            `Sent to ${email}`
+      for (
+        let i = 0;
+        i <
+        participants.length;
+        i +=
+          BATCH_SIZE
+      ) {
+        const batch =
+          participants.slice(
+            i,
+            i +
+              BATCH_SIZE
           );
-        } catch (error) {
-          progress.failed++;
 
-          logs.push({
-            name:
-              participant.name,
-            email:
-              participant.email,
-            status:
-              "Email Failed",
-          });
+        await Promise.all(
+          batch.map(
+            async (
+              participant
+            ) => {
+              progress.current++;
 
-          console.log(error);
-        }
+              try {
+                const name =
+                  participant.name?.trim();
+
+                const email =
+                  participant.email?.trim();
+
+                if (
+                  !email ||
+                  !isValidEmail(
+                    email
+                  )
+                ) {
+                  progress.failed++;
+
+                  logs.push(
+                    {
+                      name,
+                      email,
+                      status:
+                        "Invalid Email",
+                    }
+                  );
+
+                  return;
+                }
+
+                const certificateName =
+                  name.replace(
+                    /\s+/g,
+                    "_"
+                  ) +
+                  ".png";
+
+                const exists =
+                  extractedFiles.includes(
+                    certificateName
+                  );
+
+                if (
+                  !exists
+                ) {
+                  progress.failed++;
+
+                  logs.push(
+                    {
+                      name,
+                      email,
+                      status:
+                        "Certificate Missing",
+                    }
+                  );
+
+                  return;
+                }
+
+                const certificatePath =
+                  path.join(
+                    extractedFolder,
+                    certificateName
+                  );
+
+                const personalizedEmail =
+                  emailContent.replace(
+                    "{name}",
+                    name
+                  );
+
+                await transporter.sendMail(
+                  {
+                    from:
+                      process.env
+                        .EMAIL_USER,
+
+                    to:
+                      email,
+
+                    subject,
+
+                    text:
+                      personalizedEmail,
+
+                    attachments:
+                      [
+                        {
+                          filename:
+                            certificateName,
+
+                          path:
+                            certificatePath,
+                        },
+                      ],
+                  }
+                );
+
+                progress.success++;
+
+                logs.push(
+                  {
+                    name,
+                    email,
+                    status:
+                      "Sent",
+                  }
+                );
+
+                console.log(
+                  `Sent to ${email}`
+                );
+              } catch (
+                error
+              ) {
+                progress.failed++;
+
+                logs.push(
+                  {
+                    name:
+                      participant.name,
+                    email:
+                      participant.email,
+                    status:
+                      "Email Failed",
+                  }
+                );
+
+                console.error(
+                  error
+                );
+              }
+            }
+          )
+        );
       }
 
       progress.sending =
         false;
 
-      return res.json({
-        success: true,
-        message:
-          "Certificates sent successfully 🚀",
-
-        stats: {
-          total:
-            progress.total,
+      return res.json(
+        {
           success:
-            progress.success,
-          failed:
-            progress.failed,
-        },
-
-        logs,
-      });
-    } catch (error) {
-      console.log(error);
+            true,
+          message:
+            "Certificates sent successfully 🚀",
+          stats:
+            progress,
+          logs,
+        }
+      );
+    } catch (
+      error
+    ) {
+      console.error(
+        error
+      );
 
       progress.sending =
         false;
 
-      return res.status(500).json({
-        success: false,
-        message:
-          "Sending failed ❌",
-      });
+      return res
+        .status(500)
+        .json({
+          success:
+            false,
+          message:
+            "Sending failed ❌",
+        });
     }
   }
 );
@@ -397,10 +545,15 @@ app.post(
    Start Server
 ----------------------------- */
 
-const PORT = 5000;
+const PORT =
+  process.env.PORT ||
+  5000;
 
-app.listen(PORT, () => {
-  console.log(
-    `Server running on port ${PORT}`
-  );
-});
+app.listen(
+  PORT,
+  () => {
+    console.log(
+      `Server running on port ${PORT}`
+    );
+  }
+);
